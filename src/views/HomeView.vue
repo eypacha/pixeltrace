@@ -95,6 +95,10 @@ function draw() {
     ctx.drawImage(backgroundImage, drawX, drawY, drawWidth, drawHeight)
     ctx.globalAlpha = 1
   }
+
+  const gridWidth = cols * pixelSize
+  const gridHeight = rows * pixelSize
+
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const color = grid[y][x]
@@ -118,6 +122,14 @@ function draw() {
       )
     }
   }
+
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.32)"
+  ctx.strokeRect(
+    gridOffsetX,
+    gridOffsetY,
+    gridWidth,
+    gridHeight
+  )
 }
 
 function handleBackgroundImageChange(e) {
