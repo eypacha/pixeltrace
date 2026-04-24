@@ -1,7 +1,20 @@
 <template>
   <div class="p-4">
-    <div class="mb-4">
-      <input type="color" v-model="currentColor" />
+
+    <div class="mb-4 flex items-center gap-2">
+      <button
+        :class="['px-2 py-1 border rounded', currentTool === 'brush' ? 'bg-blue-200' : 'bg-white']"
+        @click="currentTool = 'brush'"
+      >Brush</button>
+      <button
+        :class="['px-2 py-1 border rounded', currentTool === 'eraser' ? 'bg-blue-200' : 'bg-white']"
+        @click="currentTool = 'eraser'"
+      >Eraser</button>
+      <button
+        class="px-2 py-1 border rounded bg-green-100"
+        @click="exportImage"
+      >Export</button>
+      <input type="color" v-model="currentColor" class="ml-4" />
     </div>
 
     <canvas
@@ -26,15 +39,17 @@ const pixelSize = 16
 
 let ctx = null
 
-// estado de la grilla
+
 const grid = Array.from({ length: rows }, () =>
   Array.from({ length: cols }, () => null)
 )
 
-let isDrawing = false
-let currentColor = "#000000"
+const currentTool = ref("brush")
 
-// --- INIT ---
+
+let isDrawing = false
+let currentColor = ref("#000000")
+
 onMounted(() => {
   const canvas = canvasRef.value
   canvas.width = cols * pixelSize
@@ -44,7 +59,6 @@ onMounted(() => {
   draw()
 })
 
-// --- DRAW ---
 function draw() {
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
 
@@ -74,7 +88,6 @@ function draw() {
   }
 }
 
-// --- INPUT ---
 function getCellFromMouse(e) {
   const rect = canvasRef.value.getBoundingClientRect()
   const x = Math.floor((e.clientX - rect.left) / pixelSize)
@@ -83,26 +96,56 @@ function getCellFromMouse(e) {
   return { x, y }
 }
 
+
 function paint(e) {
   const { x, y } = getCellFromMouse(e)
-
   if (x >= 0 && x < cols && y >= 0 && y < rows) {
-    grid[y][x] = currentColor
+    if (currentTool.value === "brush") {
+      grid[y][x] = currentColor.value
+    } else if (currentTool.value === "eraser") {
+      grid[y][x] = null
+    }
     draw()
   }
 }
+
 
 function handleMouseDown(e) {
   isDrawing = true
   paint(e)
 }
 
+
 function handleMouseMove(e) {
   if (!isDrawing) return
   paint(e)
 }
 
+
 function handleMouseUp() {
   isDrawing = false
+}
+
+function exportImage() {
+  const exportCanvas = document.createElement('canvas')
+  exportCanvas.width = cols
+  exportCanvas.height = rows
+  const exportCtx = exportCanvas.getContext('2d')
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const color = grid[y][x]
+      if (color) {
+        exportCtx.fillStyle = color
+        exportCtx.fillRect(x, y, 1, 1)
+      }
+    }
+  }
+  const dataUrl = exportCanvas.toDataURL('image/png')
+  const a = document.createElement('a')
+  a.href = dataUrl
+  a.download = 'pixeltrace.png'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
 }
 </script>
