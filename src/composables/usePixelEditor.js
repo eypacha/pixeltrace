@@ -1,9 +1,13 @@
 import { ref } from "vue"
 import { exportPixelGridToDataUrl } from "../utils/canvas-renderer.js"
 import {
+  GRID_EDGE_SIZE,
+  clampGridOffset,
   createPixelGrid,
   getCellsOnLine,
-  isCellInsideGrid
+  getGridBounds,
+  isCellInsideGrid,
+  isOnGridEdge
 } from "../utils/pixel-grid.js"
 import { loadImageFromFile } from "../utils/image-loader.js"
 
@@ -19,14 +23,60 @@ export function usePixelEditor() {
   const backgroundImage = ref(null)
   const gridOffsetX = ref(0)
   const gridOffsetY = ref(0)
+  const canvasWidth = ref(0)
+  const canvasHeight = ref(0)
+  const isDraggingGrid = ref(false)
 
   let isDrawing = false
   let lastCell = null
+  let dragStartX = 0
+  let dragStartY = 0
+  let initialOffsetX = 0
+  let initialOffsetY = 0
+  let hasInitializedGridPosition = false
   let backgroundLoadToken = 0
 
+  const gridWidth = cols * pixelSize
+  const gridHeight = rows * pixelSize
+
+  function setGridOffset(offsetX, offsetY) {
+    if (canvasWidth.value <= 0 || canvasHeight.value <= 0) {
+      gridOffsetX.value = offsetX
+      gridOffsetY.value = offsetY
+      return
+    }
+
+    const clamped = clampGridOffset(
+      offsetX,
+      offsetY,
+      canvasWidth.value,
+      canvasHeight.value,
+      gridWidth,
+      gridHeight
+    )
+
+    gridOffsetX.value = clamped.x
+    gridOffsetY.value = clamped.y
+  }
+
   function handleCanvasResize({ width, height }) {
-    gridOffsetX.value = (width - cols * pixelSize) / 2
-    gridOffsetY.value = (height - rows * pixelSize) / 2
+    canvasWidth.value = width
+    canvasHeight.value = height
+
+    if (!hasInitializedGridPosition) {
+      setGridOffset((width - gridWidth) / 2, (height - gridHeight) / 2)
+      hasInitializedGridPosition = true
+      return
+    }
+
+    setGridOffset(gridOffsetX.value, gridOffsetY.value)
+  }
+
+  function updateGridDragPosition(mouseX, mouseY) {
+    setGridOffset(
+      initialOffsetX + (mouseX - dragStartX),
+      initialOffsetY + (mouseY - dragStartY)
+    )
   }
 
   function paintCell(cell) {
@@ -41,14 +91,49 @@ export function usePixelEditor() {
     }
   }
 
-  function handleCellDown(cell) {
+  function handleCellDown(payload = {}) {
+    const { cell, mouseX, mouseY } = payload
+    if (!cell) {
+      return
+    }
+
+    const bounds = getGridBounds(
+      gridOffsetX.value,
+      gridOffsetY.value,
+      cols,
+      rows,
+      pixelSize
+    )
+
+    if (isOnGridEdge(mouseX, mouseY, bounds, GRID_EDGE_SIZE)) {
+      isDraggingGrid.value = true
+      dragStartX = mouseX
+      dragStartY = mouseY
+      initialOffsetX = gridOffsetX.value
+      initialOffsetY = gridOffsetY.value
+      isDrawing = false
+      lastCell = null
+      return
+    }
+
     isDrawing = true
     lastCell = cell
     paintCell(cell)
   }
 
-  function handleCellMove(cell) {
+  function handleCellMove(payload = {}) {
+    const { cell, mouseX, mouseY } = payload
+
+    if (isDraggingGrid.value) {
+      updateGridDragPosition(mouseX, mouseY)
+      return
+    }
+
     if (!isDrawing) {
+      return
+    }
+
+    if (!cell) {
       return
     }
 
@@ -58,6 +143,7 @@ export function usePixelEditor() {
   }
 
   function handlePointerUp() {
+    isDraggingGrid.value = false
     isDrawing = false
     lastCell = null
   }
@@ -107,6 +193,7 @@ export function usePixelEditor() {
     backgroundImage,
     gridOffsetX,
     gridOffsetY,
+    isDraggingGrid,
     handleCanvasResize,
     handleCellDown,
     handleCellMove,

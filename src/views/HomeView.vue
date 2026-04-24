@@ -15,6 +15,7 @@
         :pixel-size="pixelSize"
         :grid-offset-x="gridOffsetX"
         :grid-offset-y="gridOffsetY"
+        :is-dragging-grid="isDraggingGrid"
         :background-image="backgroundImage"
         :background-opacity="backgroundOpacity"
         @resize="handleCanvasResize"
@@ -42,6 +43,7 @@ const {
   backgroundImage,
   gridOffsetX,
   gridOffsetY,
+  isDraggingGrid,
   handleCanvasResize,
   handleCellDown,
   handleCellMove,

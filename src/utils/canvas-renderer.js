@@ -1,3 +1,5 @@
+import { GRID_EDGE_SIZE } from "./pixel-grid.js"
+
 export function drawPixelEditorCanvas(ctx, options) {
   const {
     grid,
@@ -47,8 +49,15 @@ export function drawPixelEditorCanvas(ctx, options) {
     }
   }
 
-  ctx.strokeStyle = "rgba(0, 0, 0, 0.32)"
-  ctx.strokeRect(gridOffsetX, gridOffsetY, gridWidth, gridHeight)
+  const edge = GRID_EDGE_SIZE
+
+  ctx.save()
+  ctx.fillStyle = "rgba(0, 0, 0, 0.28)"
+  ctx.fillRect(gridOffsetX - edge, gridOffsetY - edge, gridWidth + edge * 2, edge)
+  ctx.fillRect(gridOffsetX - edge, gridOffsetY + gridHeight, gridWidth + edge * 2, edge)
+  ctx.fillRect(gridOffsetX - edge, gridOffsetY, edge, gridHeight)
+  ctx.fillRect(gridOffsetX + gridWidth, gridOffsetY, edge, gridHeight)
+  ctx.restore()
 }
 
 export function exportPixelGridToDataUrl(grid, cols, rows) {

@@ -2,19 +2,25 @@
   <div ref="containerRef" class="h-full w-full">
     <canvas
       ref="canvasRef"
+      :style="{ cursor }"
       class="border w-full h-full block"
       @mousedown="handleMouseDown"
       @mousemove="handleMouseMove"
       @mouseup="handlePointerUp"
-      @mouseleave="handlePointerUp"
+      @mouseleave="handleMouseLeave"
     />
   </div>
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { drawPixelEditorCanvas } from "../../utils/canvas-renderer.js"
-import { getCellFromPoint } from "../../utils/pixel-grid.js"
+import {
+  GRID_EDGE_SIZE,
+  getCellFromPoint,
+  getGridBounds,
+  isOnGridEdge
+} from "../../utils/pixel-grid.js"
 
 const props = defineProps({
   grid: {
@@ -41,6 +47,10 @@ const props = defineProps({
     type: Number,
     required: true
   },
+  isDraggingGrid: {
+    type: Boolean,
+    default: false
+  },
   backgroundImage: {
     type: Object,
     default: null
@@ -60,9 +70,37 @@ const emit = defineEmits([
 
 const canvasRef = ref(null)
 const containerRef = ref(null)
+const hoverMouseX = ref(null)
+const hoverMouseY = ref(null)
+const isPointerDown = ref(false)
+const isPointerDownOnGridEdge = ref(false)
 
 let resizeObserver = null
-let isPointerDown = false
+
+const cursor = computed(() => {
+  const bounds = getGridBounds(
+    props.gridOffsetX,
+    props.gridOffsetY,
+    props.cols,
+    props.rows,
+    props.pixelSize
+  )
+
+  const onGridEdge =
+    hoverMouseX.value !== null &&
+    hoverMouseY.value !== null &&
+    isOnGridEdge(hoverMouseX.value, hoverMouseY.value, bounds, GRID_EDGE_SIZE)
+
+  if (props.isDraggingGrid || (isPointerDown.value && isPointerDownOnGridEdge.value)) {
+    return "grabbing"
+  }
+
+  if (!onGridEdge) {
+    return "default"
+  }
+
+  return "grab"
+})
 
 function drawCanvas() {
   const canvas = canvasRef.value
@@ -109,49 +147,77 @@ function syncCanvasSize() {
   emit("resize", { width, height })
 }
 
-function getCellFromMouse(event) {
+function getPointerPosition(event) {
   const canvas = canvasRef.value
   if (!canvas) {
-    return null
+    return { mouseX: 0, mouseY: 0 }
   }
 
   const rect = canvas.getBoundingClientRect()
-  return getCellFromPoint(
-    {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top
-    },
-    props.gridOffsetX,
-    props.gridOffsetY,
-    props.pixelSize
-  )
+  return {
+    mouseX: event.clientX - rect.left,
+    mouseY: event.clientY - rect.top
+  }
+}
+
+function createPointerPayload(event) {
+  const { mouseX, mouseY } = getPointerPosition(event)
+  return {
+    mouseX,
+    mouseY,
+    cell: getCellFromPoint(
+      { x: mouseX, y: mouseY },
+      props.gridOffsetX,
+      props.gridOffsetY,
+      props.pixelSize
+    )
+  }
 }
 
 function handleMouseDown(event) {
-  isPointerDown = true
-  const cell = getCellFromMouse(event)
-  if (cell) {
-    emit("cell-down", cell)
-  }
+  isPointerDown.value = true
+  const payload = createPointerPayload(event)
+  hoverMouseX.value = payload.mouseX
+  hoverMouseY.value = payload.mouseY
+  const bounds = getGridBounds(
+    props.gridOffsetX,
+    props.gridOffsetY,
+    props.cols,
+    props.rows,
+    props.pixelSize
+  )
+  isPointerDownOnGridEdge.value = isOnGridEdge(
+    payload.mouseX,
+    payload.mouseY,
+    bounds,
+    GRID_EDGE_SIZE
+  )
+  emit("cell-down", payload)
 }
 
 function handleMouseMove(event) {
-  if (!isPointerDown) {
+  const payload = createPointerPayload(event)
+  hoverMouseX.value = payload.mouseX
+  hoverMouseY.value = payload.mouseY
+
+  if (!isPointerDown.value) {
     return
   }
 
-  const cell = getCellFromMouse(event)
-  if (cell) {
-    emit("cell-move", cell)
-  }
+  emit("cell-move", payload)
 }
 
 function handlePointerUp() {
-  if (!isPointerDown) {
-    return
-  }
+  isPointerDown.value = false
+  isPointerDownOnGridEdge.value = false
+  emit("pointer-up")
+}
 
-  isPointerDown = false
+function handleMouseLeave() {
+  isPointerDown.value = false
+  isPointerDownOnGridEdge.value = false
+  hoverMouseX.value = null
+  hoverMouseY.value = null
   emit("pointer-up")
 }
 
