@@ -47,8 +47,10 @@ const grid = Array.from({ length: rows }, () =>
 const currentTool = ref("brush")
 
 
+
 let isDrawing = false
 let currentColor = ref("#000000")
+let lastCell = null
 
 onMounted(() => {
   const canvas = canvasRef.value
@@ -97,33 +99,55 @@ function getCellFromMouse(e) {
 }
 
 
-function paint(e) {
-  const { x, y } = getCellFromMouse(e)
+
+function paintCell({ x, y }) {
   if (x >= 0 && x < cols && y >= 0 && y < rows) {
     if (currentTool.value === "brush") {
       grid[y][x] = currentColor.value
     } else if (currentTool.value === "eraser") {
       grid[y][x] = null
     }
-    draw()
+  }
+}
+
+function drawLine(from, to) {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const steps = Math.max(Math.abs(dx), Math.abs(dy))
+  for (let i = 0; i <= steps; i++) {
+    const x = Math.round(from.x + (dx * i) / steps)
+    const y = Math.round(from.y + (dy * i) / steps)
+    paintCell({ x, y })
   }
 }
 
 
+
 function handleMouseDown(e) {
   isDrawing = true
-  paint(e)
+  const cell = getCellFromMouse(e)
+  lastCell = cell
+  paintCell(cell)
+  draw()
 }
+
 
 
 function handleMouseMove(e) {
   if (!isDrawing) return
-  paint(e)
+  const cell = getCellFromMouse(e)
+  if (lastCell) {
+    drawLine(lastCell, cell)
+  }
+  lastCell = cell
+  draw()
 }
+
 
 
 function handleMouseUp() {
   isDrawing = false
+  lastCell = null
 }
 
 function exportImage() {
