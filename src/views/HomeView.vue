@@ -1,7 +1,6 @@
 <template>
-  <div class="p-4">
-
-    <div class="mb-4 flex items-center gap-2">
+  <div class="p-4 h-screen flex flex-col">
+    <div class="mb-4 flex items-center gap-2 shrink-0">
       <button
         :class="['px-2 py-1 border rounded', currentTool === 'brush' ? 'bg-blue-200' : 'bg-white']"
         @click="currentTool = 'brush'"
@@ -16,15 +15,16 @@
       >Export</button>
       <input type="color" v-model="currentColor" class="ml-4" />
     </div>
-
-    <canvas
-      ref="canvasRef"
-      class="border"
-      @mousedown="handleMouseDown"
-      @mousemove="handleMouseMove"
-      @mouseup="handleMouseUp"
-      @mouseleave="handleMouseUp"
-    />
+    <div class="flex-1 min-h-0">
+      <canvas
+        ref="canvasRef"
+        class="border w-full h-full block"
+        @mousedown="handleMouseDown"
+        @mousemove="handleMouseMove"
+        @mouseup="handleMouseUp"
+        @mouseleave="handleMouseUp"
+      />
+    </div>
   </div>
 </template>
 
@@ -37,7 +37,10 @@ const cols = 32
 const rows = 32
 const pixelSize = 16
 
+
 let ctx = null
+let gridOffsetX = 0
+let gridOffsetY = 0
 
 
 const grid = Array.from({ length: rows }, () =>
@@ -52,37 +55,45 @@ let isDrawing = false
 let currentColor = ref("#000000")
 let lastCell = null
 
-onMounted(() => {
-  const canvas = canvasRef.value
-  canvas.width = cols * pixelSize
-  canvas.height = rows * pixelSize
 
+function resizeCanvas() {
+  const canvas = canvasRef.value
+    const parent = canvas.parentElement
+    const rect = parent.getBoundingClientRect()
+    canvas.width = rect.width
+    canvas.height = rect.height
+  gridOffsetX = (canvas.width - cols * pixelSize) / 2
+  gridOffsetY = (canvas.height - rows * pixelSize) / 2
   ctx = canvas.getContext("2d")
   draw()
+}
+
+onMounted(() => {
+  resizeCanvas()
+  window.addEventListener('resize', resizeCanvas)
 })
+
 
 function draw() {
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
-
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const color = grid[y][x]
-
+      const px = gridOffsetX + x * pixelSize
+      const py = gridOffsetY + y * pixelSize
       if (color) {
         ctx.fillStyle = color
         ctx.fillRect(
-          x * pixelSize,
-          y * pixelSize,
+          px,
+          py,
           pixelSize,
           pixelSize
         )
       }
-
-      // grid lines
       ctx.strokeStyle = "#eee"
       ctx.strokeRect(
-        x * pixelSize,
-        y * pixelSize,
+        px,
+        py,
         pixelSize,
         pixelSize
       )
@@ -90,11 +101,11 @@ function draw() {
   }
 }
 
+
 function getCellFromMouse(e) {
   const rect = canvasRef.value.getBoundingClientRect()
-  const x = Math.floor((e.clientX - rect.left) / pixelSize)
-  const y = Math.floor((e.clientY - rect.top) / pixelSize)
-
+  const x = Math.floor((e.clientX - rect.left - gridOffsetX) / pixelSize)
+  const y = Math.floor((e.clientY - rect.top - gridOffsetY) / pixelSize)
   return { x, y }
 }
 
