@@ -14,6 +14,8 @@
         @click="exportImage"
       >Export</button>
       <input type="color" v-model="currentColor" class="ml-4" />
+      <input type="file" accept="image/*" class="ml-2" @change="handleBackgroundImageChange" />
+      <input type="range" min="0" max="1" step="0.01" class="ml-2" v-model.number="backgroundOpacity" />
     </div>
     <div class="flex-1 min-h-0">
       <canvas
@@ -29,7 +31,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue"
+import { ref, onMounted, watch } from "vue"
 
 const canvasRef = ref(null)
 
@@ -48,12 +50,14 @@ const grid = Array.from({ length: rows }, () =>
 )
 
 const currentTool = ref("brush")
+const backgroundOpacity = ref(0.5)
 
 
 
 let isDrawing = false
 let currentColor = ref("#000000")
 let lastCell = null
+let backgroundImage = null
 
 
 function resizeCanvas() {
@@ -73,9 +77,24 @@ onMounted(() => {
   window.addEventListener('resize', resizeCanvas)
 })
 
+watch(backgroundOpacity, () => {
+  draw()
+})
+
 
 function draw() {
+  if (!ctx) return
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+  if (backgroundImage) {
+    const scale = Math.min(ctx.canvas.width / backgroundImage.width, ctx.canvas.height / backgroundImage.height)
+    const drawWidth = backgroundImage.width * scale
+    const drawHeight = backgroundImage.height * scale
+    const drawX = (ctx.canvas.width - drawWidth) / 2
+    const drawY = (ctx.canvas.height - drawHeight) / 2
+    ctx.globalAlpha = backgroundOpacity.value
+    ctx.drawImage(backgroundImage, drawX, drawY, drawWidth, drawHeight)
+    ctx.globalAlpha = 1
+  }
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const color = grid[y][x]
@@ -99,6 +118,23 @@ function draw() {
       )
     }
   }
+}
+
+function handleBackgroundImageChange(e) {
+  const file = e.target.files && e.target.files[0]
+  if (!file) {
+    backgroundImage = null
+    draw()
+    return
+  }
+  const image = new Image()
+  const url = URL.createObjectURL(file)
+  image.onload = () => {
+    backgroundImage = image
+    draw()
+    URL.revokeObjectURL(url)
+  }
+  image.src = url
 }
 
 
